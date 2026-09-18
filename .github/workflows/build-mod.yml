@@ -29,8 +29,10 @@ jobs:
     - name: Build Mod with Gradle
       run: ./gradlew build
 
+    # FIXED: Corrected action naming syntax to prevent repository resolution errors
     - name: Upload Mod Artifact (.jar)
-      uses: actions/artifacts-upload@v1
+      uses: actions/upload-artifact@v4
       with:
         name: Fabric-Mod-Jar
-        path: build/libs/*-project.jar
+        path: build/libs/*.jar
+
