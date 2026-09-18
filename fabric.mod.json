@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "scratchbridge",
+  "version": "${version}",
+  "name": "TurboWarp Bridge",
+  "description": "Bridges commands between TurboWarp and Minecraft client",
+  "authors": [
+    "Player"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/scratchbridge/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.scratchbridge.mod.TurboWarpClientBridge"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  },
+  "mixins": []
+}
