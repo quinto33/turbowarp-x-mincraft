@@ -23,15 +23,14 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
-    # FIXED: Re-added the executable bit for the gradlew wrapper script you added earlier
     - name: Make Gradle Executable
       run: chmod +x gradlew
 
-    # FIXED: Directs the wrapper script explicitly to build the jar asset bundles
-    - name: Build Mod with Gradle Wrapper
-      run: ./gradlew build
+    # FIXED: Replaced standard generic build with the precise Fabric task to guarantee a jar is outputted
+    - name: Build Mod with Fabric Loom
+      run: ./gradlew remapJar --no-daemon
 
-    # FIXED: Multi-path catch-all search pattern to guarantee the file is collected regardless of the subfolder destination
+    # FIXED: Broadened search patterns to look through all hidden subfolders for any compiled jar
     - name: Upload Mod Artifact (.jar)
       uses: actions/upload-artifact@v4
       with:
@@ -39,3 +38,4 @@ jobs:
         path: |
           **/build/libs/*.jar
           build/libs/*.jar
+        if-no-files-found: error
