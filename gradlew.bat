@@ -1,0 +1,1 @@
+@rem Failed to download official gradlew.bat script: <urlopen error [Errno -3] Temporary failure in name resolution>
