@@ -20,13 +20,14 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
 
-    # The Setup action handles everything internally, even if wrapper scripts are absent
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
-    # FIXED: Replaced wrapper dependency loop with an environment native compilation sequence
+    - name: Make Gradle Executable
+      run: chmod +x gradlew
+
     - name: Build Mod with Gradle
-      run: gradle build
+      run: ./gradlew build
 
     - name: Upload Mod Artifact (.jar)
       uses: actions/upload-artifact@v4
