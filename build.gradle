@@ -44,7 +44,7 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-// FORCE GENERATE THE JAR FILE
+// FORCES LOOM TO REMAP AND OUTPUT THE FINAL MOD JAR
 jar {
     from("LICENSE") {
         rename { "${it}_${project.base.archivesName.get()}"}
