@@ -1,93 +1,107 @@
-package com.scratchbridge.mod;
+package com.quinto33.bridge;
 
-import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.minecraft.client.MinecraftClient;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.minecraft.server.MinecraftServer;
 import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
-public class TurboWarpClientBridge implements ClientModInitializer {
-    private static HttpServer server;
+public class TurboWarpClientBridge implements ModInitializer {
+    private static MinecraftServer currentServer;
+    private HttpServer webServer;
 
     @Override
-    public void onInitializeClient() {
-        System.out.println("🚀 TurboWarp Client Bridge Mod Initialization started!");
-        
-        // Listen for when you log into a world or a multiplayer server
-        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
-            if (client.player != null) {
-                String currentUsername = client.getSession().getUsername();
-                System.out.println("Welcome " + currentUsername + "! Bridge is tracking your player name variable.");
-            }
+    public void onInitialize() {
+        System.out.println("[TurboWarp Bridge] Initializing Mod...");
+
+        // 1. Capture the running server instance when a player joins the world
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            currentServer = server;
         });
 
-        startBridgeServer();
-    }
-
-    private void startBridgeServer() {
+        // 2. Start the embedded HTTP server to listen for commands from TurboWarp
         try {
-            // Spin up our local port server on channel 8080
-            server = HttpServer.create(new InetSocketAddress(8080), 0);
+            webServer = HttpServer.create(new InetSocketAddress(8080), 0);
             
-            // 📡 Route 1: Handshake (/handshake) -> Pings the pointy block 'is game online?' to TRUE
-            server.createContext("/handshake", exchange -> {
-                String response = "{\"status\": \"connected\", \"message\": \"Fabric Client Online\"}";
-                sendCORSResponse(exchange, response);
+            // Handshake context for the "is game online?" TurboWarp boolean block
+            webServer.createContext("/handshake", exchange -> {
+                // Add Cross-Origin Resource Sharing (CORS) headers so the browser doesn't block it
+                exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
+                
+                String response = "Handshake secured!";
+                exchange.sendResponseHeaders(200, response.length());
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(response.getBytes());
+                }
+                exchange.close();
             });
 
-            // 🚀 Route 2: Core Command Router (/command) -> Handles movements, actions, WorldEdit, etc.
-            server.createContext("/command", exchange -> {
-                if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            // Command receiving context for executing actions like /say and /summon
+            webServer.createContext("/command", new HttpHandler() {
+                @Override
+                public void handle(HttpExchange exchange) throws IOException {
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                    exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
                     
-                    // Pull the command value cleanly out of TurboWarp's JSON payload
-                    if (body.contains("\"cmd\":\"")) {
-                        String cmd = body.split("\"cmd\":\"")[1].split("\"")[0];
-                        
-                        MinecraftClient client = MinecraftClient.getInstance();
-                        if (client != null && client.player != null) {
-                            // Route the text directly back onto Minecraft's main gameplay thread safely
-                            client.execute(() -> {
-                                if (cmd.startsWith("/")) {
-                                    // Handles single slash and WorldEdit double slash commands automatically
-                                    client.player.networkHandler.sendCommand(cmd.substring(1));
-                                } else {
-                                    // Sends normal chat messages
-                                    client.player.networkHandler.sendChatMessage(cmd);
+                    // Handle CORS preflight requests from browsers
+                    if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        exchange.sendResponseHeaders(204, -1);
+                        exchange.close();
+                        return;
+                    }
+
+                    if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        try (InputStream is = exchange.getRequestBody()) {
+                            String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                            
+                            // FIXED: Extract the command string step-by-step to avoid array splitting syntax errors
+                            if (body.contains("\"cmd\":\"")) {
+                                String[] firstSplit = body.split("\"cmd\":\"");
+                                if (firstSplit.length > 1) {
+                                    String[] secondSplit = firstSplit[1].split("\"");
+                                    String cmd = secondSplit[0]; // Isolate the clean command string (e.g., "/say Hello!")
+                                    
+                                    // Direct the execution onto Minecraft's primary server thread loop safely
+                                    if (currentServer != null) {
+                                        currentServer.execute(() -> {
+                                            currentServer.getCommandManager().executeWithPrefix(
+                                                currentServer.getCommandSource(), cmd
+                                            );
+                                        });
+                                    }
                                 }
-                            });
+                            }
                         }
                     }
-                    sendCORSResponse(exchange, "{\"success\": true}");
-                } else {
-                    exchange.sendResponseHeaders(405, -1); // Reject non-POST requests securely
+                    exchange.sendResponseHeaders(200, 0);
+                    exchange.close();
                 }
             });
 
-            server.setExecutor(null);
-            server.start();
-            System.out.println("✅ TurboWarp Client Bridge is listening on port 8080!");
-        } catch (IOException e) {
-            System.out.println("❌ Bridge failed to secure port 8080. Is another program using it?");
+            webServer.setExecutor(null); 
+            webServer.start();
+            System.out.println("[TurboWarp Bridge] Server successfully active on port 8080!");
+        } catch (Exception e) {
+            System.err.println("[TurboWarp Bridge] Failed to start HTTP server!");
+            e.printStackTrace();
         }
-    }
 
-    private void sendCORSResponse(HttpExchange exchange, String response) throws IOException {
-        // Essential web-safety overrides to make sure TurboWarp does not get blocked by cross-origin rules
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
-        
-        byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
-        exchange.sendResponseHeaders(200, bytes.length);
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(bytes);
-        }
+        // 3. Optional: Hook into block breaking events to print activity logs
+        PlayerBlockBreakEvents.BREAK.register((world, player, pos, state, blockEntity) -> {
+            String brokenBlockName = state.getBlock().toString(); 
+            System.out.println("[TurboWarp Bridge] Player broke block: " + brokenBlockName);
+            return true;
+        });
     }
 }
