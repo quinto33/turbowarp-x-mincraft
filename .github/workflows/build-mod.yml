@@ -26,16 +26,15 @@ jobs:
     - name: Make Gradle Executable
       run: chmod +x gradlew
 
-    # FIXED: Replaced standard generic build with the precise Fabric task to guarantee a jar is outputted
-    - name: Build Mod with Fabric Loom
-      run: ./gradlew remapJar --no-daemon
+    # Compiles and forces output generation
+    - name: Build Mod with Gradle
+      run: ./gradlew build --no-daemon
 
-    # FIXED: Broadened search patterns to look through all hidden subfolders for any compiled jar
+    # Searches and uploads the generated artifact
     - name: Upload Mod Artifact (.jar)
       uses: actions/upload-artifact@v4
       with:
         name: Fabric-Mod-Jar
-        path: |
-          **/build/libs/*.jar
-          build/libs/*.jar
+        path: build/libs/*.jar
         if-no-files-found: error
+
