@@ -9,6 +9,10 @@ pluginManagement {
     }
 }
 
+plugins {
+    id 'fabric-loom' version '1.8.12'
+}
+
 dependencyResolutionManagement {
     repositories {
         maven {
@@ -17,10 +21,6 @@ dependencyResolutionManagement {
         }
         mavenCentral()
     }
-}
-
-plugins {
-    id 'fabric-loom' version '1.8.12'
 }
 
 rootProject.name = 'turbowarp-x-mincraft'
