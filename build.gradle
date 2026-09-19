@@ -1,16 +1,59 @@
-org.gradle.jvmargs=-Xmx3G
-org.gradle.parallel=true
+plugins {
+    id 'fabric-loom' version '1.7.4'
+    id 'maven-publish'
+}
 
-# Core Project Specifications
-minecraft_version=1.21.1
-yarn_mappings=1.21.1+build.3
-loader_version=0.19.5
-loom_version=1.17-SNAPSHOT
+group = project.property('mod_group')
+version = project.property('mod_version')
 
-# FIXED: Added this variable definition so line 22 can read it perfectly!
-fabric_api_version=0.116.17+1.21.1
+base {
+    archivesName = project.property('mod_id')
+}
 
-# Mod Export Meta Identifiers
-mod_version=1.0.0
-mod_group=com.quinto33.bridge
-mod_id=turbowarp-x-mincraft
+repositories {
+    // Fabric Loom provides the Minecraft and Fabric Maven repositories.
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.property('minecraft_version')}"
+    mappings "net.fabricmc:yarn:${project.property('yarn_mappings')}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.property('loader_version')}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.property('fabric_version')}"
+}
+
+processResources {
+    inputs.property 'version', project.version
+
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    withSourcesJar()
+}
+
+jar {
+    from('LICENSE') {
+        rename { fileName -> "${fileName}_${project.property('mod_id')}" }
+    }
+}
+
+publishing {
+    publications {
+        create('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+
+    repositories {
+        // Add a Maven repository here if you plan to publish the mod.
+    }
+}
