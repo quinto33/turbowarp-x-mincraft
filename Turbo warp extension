@@ -44,12 +44,38 @@
                         arguments: { TARGET_BLOCK: { type: Scratch.ArgumentType.STRING, menu: 'blockList', defaultValue: 'diamond_ore' } }
                     },
                     {
+                        opcode: 'whenCustomBlockBroken',
+                        blockType: Scratch.BlockType.HAT,
+                        text: 'when player breaks custom block [CUSTOM_BLOCK]',
+                        color1: '#ffbf00',
+                        color2: '#e6ac00',
+                        arguments: {
+                            CUSTOM_BLOCK: {
+                                type: Scratch.ArgumentType.STRING,
+                                defaultValue: 'my custom block'
+                            }
+                        }
+                    },
+                    {
                         opcode: 'whenSpecificMobKilled',
                         blockType: Scratch.BlockType.HAT,
                         text: 'when player kills a [MOB_TYPE]',
                         color1: '#ffbf00',
                         color2: '#e6ac00',
                         arguments: { MOB_TYPE: { type: Scratch.ArgumentType.STRING, menu: 'mobList', defaultValue: 'zombie' } }
+                    },
+                    {
+                        opcode: 'whenCustomMobKilled',
+                        blockType: Scratch.BlockType.HAT,
+                        text: 'when player kills custom mob [CUSTOM_MOB]',
+                        color1: '#ffbf00',
+                        color2: '#e6ac00',
+                        arguments: {
+                            CUSTOM_MOB: {
+                                type: Scratch.ArgumentType.STRING,
+                                defaultValue: 'my custom mob'
+                            }
+                        }
                     },
                     {
                         opcode: 'runCustomConsoleCommand',
@@ -91,6 +117,12 @@
             };
         }
 
+        // Minecraft IDs use underscores instead of spaces. This also makes
+        // custom names case-insensitive and removes accidental extra spaces.
+        _normaliseMinecraftId(value) {
+            return String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+        }
+
         isGameOnline() { return this.isConnectedWireless; }
         getPlayerName() { return this.activePlayerName; }
         getPlayerX() { return Math.round(Number(this.playerX) || 0); }
@@ -118,8 +150,8 @@
 
         _normaliseTarget(value) {
             let target = String(value || '').trim()
-                .replace(/^https?:\\/\\//i, '')
-                .replace(/\\/.*$/, '');
+                .replace(/^https?:\/\//i, '')
+                .replace(/\/.*$/, '');
             if (!target || !/^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(target)) {
                 throw new Error('Enter a valid tablet IP address or hostname.');
             }
@@ -175,8 +207,8 @@
                         if (data.y !== undefined) this.playerY = Number(data.y) || 0;
                         if (data.z !== undefined) this.playerZ = Number(data.z) || 0;
                         // The bridge can optionally report these event values.
-                        if (data.blockBroken !== undefined) this._lastBrokenBlock = String(data.blockBroken).toLowerCase().trim();
-                        if (data.killedMob !== undefined) this._lastKilledMob = String(data.killedMob).toLowerCase().trim();
+                        if (data.blockBroken !== undefined) this._lastBrokenBlock = this._normaliseMinecraftId(data.blockBroken);
+                        if (data.killedMob !== undefined) this._lastKilledMob = this._normaliseMinecraftId(data.killedMob);
                     }
                     this.isConnectedWireless = true;
                 })
@@ -196,8 +228,8 @@
 
         runCompressedWorldEdit(args) {
             const action = String(args.WE_CMD || '').trim().toLowerCase();
-            const blockA = String(args.BLOCK_A || '').toLowerCase().trim();
-            const blockB = String(args.BLOCK_B || '').toLowerCase().trim();
+            const blockA = this._normaliseMinecraftId(args.BLOCK_A);
+            const blockB = this._normaliseMinecraftId(args.BLOCK_B);
             const allowedActions = ['set', 'replace', 'walls', 'faces', 'pos1', 'pos2', 'wand'];
             if (!allowedActions.includes(action)) return Promise.reject(new Error('Unsupported WorldEdit action.'));
 
@@ -241,11 +273,19 @@
         }
 
         whenSpecificBlockBroken(args) {
-            return this._lastBrokenBlock === String(args.TARGET_BLOCK || '').toLowerCase().trim();
+            return this._lastBrokenBlock === this._normaliseMinecraftId(args.TARGET_BLOCK);
+        }
+
+        whenCustomBlockBroken(args) {
+            return this._lastBrokenBlock === this._normaliseMinecraftId(args.CUSTOM_BLOCK);
         }
 
         whenSpecificMobKilled(args) {
-            return this._lastKilledMob === String(args.MOB_TYPE || '').toLowerCase().trim();
+            return this._lastKilledMob === this._normaliseMinecraftId(args.MOB_TYPE);
+        }
+
+        whenCustomMobKilled(args) {
+            return this._lastKilledMob === this._normaliseMinecraftId(args.CUSTOM_MOB);
         }
     }
 
