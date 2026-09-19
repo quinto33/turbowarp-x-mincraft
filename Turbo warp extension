@@ -3,21 +3,25 @@
 
     class ScratchCommandProject {
         constructor() {
-            this.tabletIP = "192.168.1.15";
-            this.isConnectedWireless = false; 
-            this._lastBrokenBlock = null; 
+            this.tabletIP = '192.168.1.15';
+            this.isConnectedWireless = false;
+            this._lastBrokenBlock = null;
             this._lastKilledMob = null;
-            this.activePlayerName = "Steve";
+            this.activePlayerName = 'Steve';
             this.playerX = 0;
             this.playerY = 0;
             this.playerZ = 0;
+            this._pollTimer = null;
+            this._polling = false;
+            this._requestTimeout = 5000;
+            this._pollInterval = 250;
         }
 
         getInfo() {
             return {
                 id: 'scratchCommandProject',
                 name: 'Advanced Minecraft Bridge',
-                color1: '#00bfff', 
+                color1: '#00bfff',
                 color2: '#0099cc',
                 blocks: [
                     {
@@ -27,31 +31,40 @@
                         arguments: { IP_ADDRESS: { type: Scratch.ArgumentType.STRING, defaultValue: '192.168.1.15' } }
                     },
                     {
+                        opcode: 'disconnectWireless',
+                        blockType: Scratch.BlockType.COMMAND,
+                        text: 'disconnect from Minecraft bridge'
+                    },
+                    {
                         opcode: 'whenSpecificBlockBroken',
                         blockType: Scratch.BlockType.HAT,
                         text: 'when player breaks a [TARGET_BLOCK] block',
-                        color1: '#ffbf00', color2: '#e6ac00',
+                        color1: '#ffbf00',
+                        color2: '#e6ac00',
                         arguments: { TARGET_BLOCK: { type: Scratch.ArgumentType.STRING, menu: 'blockList', defaultValue: 'diamond_ore' } }
                     },
                     {
                         opcode: 'whenSpecificMobKilled',
                         blockType: Scratch.BlockType.HAT,
                         text: 'when player kills a [MOB_TYPE]',
-                        color1: '#ffbf00', color2: '#e6ac00',
+                        color1: '#ffbf00',
+                        color2: '#e6ac00',
                         arguments: { MOB_TYPE: { type: Scratch.ArgumentType.STRING, menu: 'mobList', defaultValue: 'zombie' } }
                     },
                     {
                         opcode: 'runCustomConsoleCommand',
                         blockType: Scratch.BlockType.COMMAND,
                         text: 'Minecraft command: [CUSTOM_CMD]',
-                        color1: '#2cfb5e', color2: '#1b9e3b', 
+                        color1: '#2cfb5e',
+                        color2: '#1b9e3b',
                         arguments: { CUSTOM_CMD: { type: Scratch.ArgumentType.STRING, defaultValue: '/time set day' } }
                     },
                     {
                         opcode: 'runCompressedWorldEdit',
                         blockType: Scratch.BlockType.COMMAND,
                         text: 'WorldEdit: run [WE_CMD] targeting block [BLOCK_A] (if replacing, swap with [BLOCK_B])',
-                        color1: '#ff8c00', color2: '#cc7000', 
+                        color1: '#ff8c00',
+                        color2: '#cc7000',
                         arguments: {
                             WE_CMD: { type: Scratch.ArgumentType.STRING, menu: 'weActionList', defaultValue: 'set' },
                             BLOCK_A: { type: Scratch.ArgumentType.STRING, menu: 'blockList', defaultValue: 'stone' },
@@ -80,44 +93,115 @@
 
         isGameOnline() { return this.isConnectedWireless; }
         getPlayerName() { return this.activePlayerName; }
-        getPlayerX() { return Math.round(this.playerX); }
-        getPlayerY() { return Math.round(this.playerY); }
-        getPlayerZ() { return Math.round(this.playerZ); }
+        getPlayerX() { return Math.round(Number(this.playerX) || 0); }
+        getPlayerY() { return Math.round(Number(this.playerY) || 0); }
+        getPlayerZ() { return Math.round(Number(this.playerZ) || 0); }
+
+        _baseUrl() {
+            return `http://${this.tabletIP}:8080`;
+        }
+
+        _fetch(url, options) {
+            const controller = typeof AbortController === 'function' ? new AbortController() : null;
+            const requestOptions = Object.assign({}, options || {});
+            if (controller) requestOptions.signal = controller.signal;
+
+            const timeout = setTimeout(() => {
+                if (controller) controller.abort();
+            }, this._requestTimeout);
+
+            return fetch(url, requestOptions).then(response => {
+                if (!response.ok) throw new Error(`Bridge returned HTTP ${response.status}`);
+                return response;
+            }).finally(() => clearTimeout(timeout));
+        }
+
+        _normaliseTarget(value) {
+            let target = String(value || '').trim()
+                .replace(/^https?:\\/\\//i, '')
+                .replace(/\\/.*$/, '');
+            if (!target || !/^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(target)) {
+                throw new Error('Enter a valid tablet IP address or hostname.');
+            }
+            return target;
+        }
 
         setWirelessTarget(args) {
-            this.tabletIP = args.IP_ADDRESS;
-            this.pollPlayerData(); 
-            return fetch(`http://${this.tabletIP}:8080/handshake`)
-                .then(() => { this.isConnectedWireless = true; })
-                .catch(() => { this.isConnectedWireless = true; });
+            let target;
+            try {
+                target = this._normaliseTarget(args.IP_ADDRESS);
+            } catch (error) {
+                this.isConnectedWireless = false;
+                return Promise.reject(error);
+            }
+
+            this.disconnectWireless();
+            this.tabletIP = target;
+            return this._fetch(`${this._baseUrl()}/handshake`)
+                .then(() => {
+                    this.isConnectedWireless = true;
+                    this._startPolling();
+                })
+                .catch(error => {
+                    this.isConnectedWireless = false;
+                    throw error;
+                });
+        }
+
+        disconnectWireless() {
+            this._polling = false;
+            if (this._pollTimer !== null) {
+                clearTimeout(this._pollTimer);
+                this._pollTimer = null;
+            }
+            this.isConnectedWireless = false;
+        }
+
+        _startPolling() {
+            if (this._polling) return;
+            this._polling = true;
+            this.pollPlayerData();
         }
 
         pollPlayerData() {
-            if (!this.tabletIP) return;
-            fetch(`http://${this.tabletIP}:8080/playerdata`)
-                .then(res => res.json())
+            if (!this._polling || !this.tabletIP) return;
+
+            this._fetch(`${this._baseUrl()}/playerdata`)
+                .then(response => response.json())
                 .then(data => {
-                    if (data.name) this.activePlayerName = data.name;
-                    if (data.x !== undefined) this.playerX = data.x;
-                    if (data.y !== undefined) this.playerY = data.y;
-                    if (data.z !== undefined) this.playerZ = data.z;
+                    if (data && typeof data === 'object') {
+                        if (data.name !== undefined) this.activePlayerName = String(data.name);
+                        if (data.x !== undefined) this.playerX = Number(data.x) || 0;
+                        if (data.y !== undefined) this.playerY = Number(data.y) || 0;
+                        if (data.z !== undefined) this.playerZ = Number(data.z) || 0;
+                        // The bridge can optionally report these event values.
+                        if (data.blockBroken !== undefined) this._lastBrokenBlock = String(data.blockBroken).toLowerCase().trim();
+                        if (data.killedMob !== undefined) this._lastKilledMob = String(data.killedMob).toLowerCase().trim();
+                    }
+                    this.isConnectedWireless = true;
                 })
-                .catch(() => {})
+                .catch(() => {
+                    this.isConnectedWireless = false;
+                })
                 .finally(() => {
-                    setTimeout(() => this.pollPlayerData(), 250);
+                    if (this._polling) {
+                        this._pollTimer = setTimeout(() => this.pollPlayerData(), this._pollInterval);
+                    }
                 });
         }
 
         runCustomConsoleCommand(args) {
-            return this.sendCmd(args.CUSTOM_CMD);
+            return this.sendCmd(String(args.CUSTOM_CMD || '').trim());
         }
 
         runCompressedWorldEdit(args) {
-            const action = args.WE_CMD.trim();
-            const blockA = args.BLOCK_A.toLowerCase().trim();
-            const blockB = args.BLOCK_B.toLowerCase().trim();
-            let cmdText = "";
+            const action = String(args.WE_CMD || '').trim().toLowerCase();
+            const blockA = String(args.BLOCK_A || '').toLowerCase().trim();
+            const blockB = String(args.BLOCK_B || '').toLowerCase().trim();
+            const allowedActions = ['set', 'replace', 'walls', 'faces', 'pos1', 'pos2', 'wand'];
+            if (!allowedActions.includes(action)) return Promise.reject(new Error('Unsupported WorldEdit action.'));
 
+            let cmdText;
             if (action === 'pos1' || action === 'pos2' || action === 'wand') {
                 cmdText = `//${action}`;
             } else if (action === 'replace') {
@@ -129,25 +213,40 @@
         }
 
         sendCmd(cmdText) {
-            return fetch(`http://${this.tabletIP}:8080/command`, {
+            const command = String(cmdText || '').trim();
+            if (!command) return Promise.reject(new Error('Minecraft command cannot be empty.'));
+            if (!this.tabletIP) return Promise.reject(new Error('No Minecraft bridge is configured.'));
+
+            return this._fetch(`${this._baseUrl()}/command`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cmd: cmdText })
-            }).catch(() => {});
+                body: JSON.stringify({ cmd: command })
+            }).then(response => {
+                this.isConnectedWireless = true;
+                return response;
+            }).catch(error => {
+                this.isConnectedWireless = false;
+                throw error;
+            });
         }
 
         sayInMinecraft(args) {
             const jsonChat = JSON.stringify([
-                { text: "<", color: "white" },
-                { text: "TurboWarp", color: "aqua", bold: true },
-                { text: "> ", color: "white" },
-                { text: args.CHAT_TEXT, color: "gray" }
+                { text: '<', color: 'white' },
+                { text: 'TurboWarp', color: 'aqua', bold: true },
+                { text: '> ', color: 'white' },
+                { text: String(args.CHAT_TEXT || ''), color: 'gray' }
             ]);
             return this.sendCmd(`/tellraw @a ${jsonChat}`);
         }
 
-        whenSpecificBlockBroken(args) { return this._lastBrokenBlock === args.TARGET_BLOCK.toLowerCase().trim(); }
-        whenSpecificMobKilled(args) { return this._lastKilledMob === args.MOB_TYPE.toLowerCase().trim(); }
+        whenSpecificBlockBroken(args) {
+            return this._lastBrokenBlock === String(args.TARGET_BLOCK || '').toLowerCase().trim();
+        }
+
+        whenSpecificMobKilled(args) {
+            return this._lastKilledMob === String(args.MOB_TYPE || '').toLowerCase().trim();
+        }
     }
 
     Scratch.extensions.register(new ScratchCommandProject());
