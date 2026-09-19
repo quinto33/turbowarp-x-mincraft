@@ -26,33 +26,46 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Verify Java and Gradle
+      - name: Clean project
+        run: ./gradlew clean --no-daemon --stacktrace
+
+      - name: Build project
+        run: ./gradlew build --no-daemon --stacktrace
+
+      - name: List all generated files
         run: |
-          java -version
-          ./gradlew --version
+          echo "All JAR files:"
+          find . -type f -name "*.jar" -print || true
 
-      - name: Clean previous build files
-        run: ./gradlew clean --no-daemon
+          echo "Build directories:"
+          find . -type d -name "build" -print || true
 
-      - name: Build remapped mod JAR
-        run: ./gradlew remapJar --no-daemon --stacktrace
+          echo "Build contents:"
+          find . -type f -path "*/build/*" -print || true
 
-      - name: Show generated build files
+      - name: Copy the mod JAR to a known location
         run: |
-          echo "Build directory:"
-          find build -maxdepth 4 -type f -print 2>/dev/null || true
+          mkdir -p upload
 
-          echo "JAR files:"
-          find . -type f -path "*/build/libs/*.jar" -print
+          JAR_FILE=$(find . -type f \
+            -path "*/build/libs/*.jar" \
+            ! -name "*-sources.jar" \
+            ! -name "*-dev.jar" \
+            | head -n 1)
+
+          if [ -z "$JAR_FILE" ]; then
+            echo "ERROR: Gradle did not produce a mod JAR."
+            exit 1
+          fi
+
+          echo "Found mod JAR: $JAR_FILE"
+          cp "$JAR_FILE" upload/turbowarp-x-mincraft.jar
+          ls -l upload
 
       - name: Upload mod JAR
         uses: actions/upload-artifact@v4
         with:
           name: turbowarp-x-mincraft-mod
-          path: |
-            build/libs/*.jar
+          path: upload/turbowarp-x-mincraft.jar
           if-no-files-found: error
           compression-level: 0
-
-- name: Test Reporter
-  uses: dorny/test-reporter@v3.0.0
