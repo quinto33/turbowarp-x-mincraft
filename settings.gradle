@@ -1,9 +1,8 @@
 pluginManagement {
     repositories {
-        // FIXED: Complete official URL block allowing Gradle to locate the loom compiler
+        // FIXED: The exact, verified Maven server repository route from your screenshot
         maven {
-            name = "Fabric"
-            url = "https://fabricmc.net"
+            url = "https://maven.fabricmc.net/"
         }
         mavenCentral()
         gradlePluginPortal()
@@ -11,9 +10,8 @@ pluginManagement {
 }
 
 plugins {
-    id 'fabric-loom' version '1.9-SNAPSHOT'
+    // Reads your new 1.17-SNAPSHOT version setting perfectly
+    id 'fabric-loom' version '1.17-SNAPSHOT'
 }
 
 rootProject.name = 'turbowarp-x-mincraft'
-
-
