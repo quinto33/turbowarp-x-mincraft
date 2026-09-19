@@ -15,15 +15,21 @@ repositories {
         name = 'Fabric'
         url = uri('https://maven.fabricmc.net/')
     }
+
+    maven {
+        name = 'Minecraft Libraries'
+        url = uri('https://libraries.minecraft.net/')
+    }
+
     mavenCentral()
 }
 
 dependencies {
-    minecraft "com.mojang:minecraft:${minecraft_version}"
-    mappings "net.fabricmc:yarn:${yarn_mappings}:v2"
+    minecraft "com.mojang:minecraft:${project.property('minecraft_version')}"
+    mappings "net.fabricmc:yarn:${project.property('yarn_mappings')}:v2"
 
-    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    modImplementation "net.fabricmc:fabric-loader:${project.property('loader_version')}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.property('fabric_version')}"
 }
 
 processResources {
@@ -42,6 +48,7 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
+
     withSourcesJar()
 }
 
