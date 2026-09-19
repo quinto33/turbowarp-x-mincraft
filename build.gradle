@@ -1,5 +1,4 @@
 plugins {
-    // FIXED: Removed the hardcoded version string to let settings.gradle control the plugin version cleanly
     id 'fabric-loom'
     id 'maven-publish'
 }
@@ -24,14 +23,15 @@ dependencies {
 }
 
 processResources {
+    // FIXED: Corrected the metadata inputs to match your exact properties variables list
     inputs.property "version", project.version
     inputs.property "minecraft_version", project.minecraft_version
-    inputs.property "loader_version", project.loader_version
+    inputs.property "fabric_api_version", project.fabric_api_version
 
     filesMatching("fabric.mod.json") {
         expand "version": project.version,
                "minecraft_version": project.minecraft_version,
-               "loader_version": project.loader_version
+               "fabric_api_version": project.fabric_api_version
     }
 }
 
