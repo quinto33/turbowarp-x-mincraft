@@ -1,7 +1,10 @@
 pluginManagement {
     repositories {
-        // Explicitly tells Gradle where to locate the Fabric-Loom developer binaries
-        maven { url = "https://fabricmc.net" }
+        // FIXED: Complete official URL block allowing Gradle to locate the loom compiler
+        maven {
+            name = "Fabric"
+            url = "https://fabricmc.net"
+        }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -12,6 +15,5 @@ plugins {
 }
 
 rootProject.name = 'turbowarp-x-mincraft'
-
 
 
