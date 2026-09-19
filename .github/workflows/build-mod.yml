@@ -53,3 +53,6 @@ jobs:
             build/libs/*.jar
           if-no-files-found: error
           compression-level: 0
+
+- name: Test Reporter
+  uses: dorny/test-reporter@v3.0.0
