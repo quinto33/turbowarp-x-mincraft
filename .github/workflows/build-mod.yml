@@ -23,48 +23,31 @@ jobs:
           java-version: "21"
           distribution: "temurin"
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Check Gradle tasks
-        run: ./gradlew tasks --all --no-daemon
+      - name: Check Java and Gradle
+        run: |
+          java -version
+          gradle --version
 
-      - name: Clean project
-        run: ./gradlew clean --no-daemon
-
-      - name: Create remapped Fabric mod JAR
-        run: ./gradlew remapJar --no-daemon --stacktrace
+      - name: Build Fabric mod JAR
+        run: gradle clean remapJar --no-daemon --stacktrace
 
       - name: Verify generated JAR
         run: |
-          echo "Generated files:"
-          find . -type f -print | sort
-
           echo "Generated JAR files:"
           find . -type f -name "*.jar" -print
 
-          test -n "$(find . -type f -path "*/build/libs/*.jar" -print -quit)" || {
-            echo "ERROR: remapJar completed but no JAR exists in a build/libs directory."
+          test -n "$(find build/libs -maxdepth 1 -type f -name "*.jar" -print -quit)" || {
+            echo "ERROR: Gradle did not create a JAR in build/libs."
             exit 1
           }
-
-      - name: Prepare artifact
-        run: |
-          mkdir -p upload
-
-          JAR_FILE="$(find . -type f \
-            -path "*/build/libs/*.jar" \
-            ! -name "*-sources.jar" \
-            ! -name "*-dev.jar" \
-            -print -quit)"
-
-          echo "Using JAR: $JAR_FILE"
-          cp "$JAR_FILE" upload/turbowarp-x-mincraft.jar
 
       - name: Upload mod JAR
         uses: actions/upload-artifact@v4
         with:
           name: turbowarp-x-mincraft-mod
-          path: upload/turbowarp-x-mincraft.jar
+          path: build/libs/*.jar
           if-no-files-found: error
           compression-level: 0
