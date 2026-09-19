@@ -23,28 +23,18 @@ jobs:
           java-version: "21"
           distribution: "temurin"
 
-      - name: Set up Gradle 8.9
+      - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.10.2"
 
-      - name: Check Java and Gradle versions
-        run: |
-          java -version
-          gradle --version
-
-      - name: Build Fabric mod JAR
+      - name: Build Fabric mod
         run: gradle clean remapJar --no-daemon --stacktrace
 
-      - name: Verify generated JAR
+      - name: Verify JAR
         run: |
-          echo "Generated JAR files:"
-          find . -type f -name "*.jar" -print
-
-          test -n "$(find build/libs -maxdepth 1 -type f -name "*.jar" -print -quit)" || {
-            echo "ERROR: No JAR was created in build/libs."
-            exit 1
-          }
+          find build/libs -maxdepth 1 -type f -name "*.jar" -print
+          test -n "$(find build/libs -maxdepth 1 -type f -name "*.jar" -print -quit)"
 
       - name: Upload mod JAR
         uses: actions/upload-artifact@v4
