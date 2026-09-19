@@ -23,10 +23,12 @@ jobs:
           java-version: "21"
           distribution: "temurin"
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
 
-      - name: Check Java and Gradle
+      - name: Check Java and Gradle versions
         run: |
           java -version
           gradle --version
@@ -40,7 +42,7 @@ jobs:
           find . -type f -name "*.jar" -print
 
           test -n "$(find build/libs -maxdepth 1 -type f -name "*.jar" -print -quit)" || {
-            echo "ERROR: Gradle did not create a JAR in build/libs."
+            echo "ERROR: No JAR was created in build/libs."
             exit 1
           }
 
