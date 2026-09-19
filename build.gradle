@@ -23,15 +23,14 @@ dependencies {
 }
 
 processResources {
-    // FIXED: Corrected the metadata inputs to match your exact properties variables list
-    inputs.property "version", project.version
+    inputs.property "mod_version", project.mod_version
     inputs.property "minecraft_version", project.minecraft_version
-    inputs.property "fabric_api_version", project.fabric_api_version
+    inputs.property "loader_version", project.loader_version
 
     filesMatching("fabric.mod.json") {
-        expand "version": project.version,
+        expand "version": project.mod_version,
                "minecraft_version": project.minecraft_version,
-               "fabric_api_version": project.fabric_api_version
+               "loader_version": project.loader_version
     }
 }
 
