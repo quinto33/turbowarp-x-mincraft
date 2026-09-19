@@ -26,41 +26,40 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Check Gradle tasks
+        run: ./gradlew tasks --all --no-daemon
+
       - name: Clean project
-        run: ./gradlew clean --no-daemon --stacktrace
+        run: ./gradlew clean --no-daemon
 
-      - name: Build project
-        run: ./gradlew build --no-daemon --stacktrace
+      - name: Create remapped Fabric mod JAR
+        run: ./gradlew remapJar --no-daemon --stacktrace
 
-      - name: List all generated files
+      - name: Verify generated JAR
         run: |
-          echo "All JAR files:"
-          find . -type f -name "*.jar" -print || true
+          echo "Generated files:"
+          find . -type f -print | sort
 
-          echo "Build directories:"
-          find . -type d -name "build" -print || true
+          echo "Generated JAR files:"
+          find . -type f -name "*.jar" -print
 
-          echo "Build contents:"
-          find . -type f -path "*/build/*" -print || true
+          test -n "$(find . -type f -path "*/build/libs/*.jar" -print -quit)" || {
+            echo "ERROR: remapJar completed but no JAR exists in a build/libs directory."
+            exit 1
+          }
 
-      - name: Copy the mod JAR to a known location
+      - name: Prepare artifact
         run: |
           mkdir -p upload
 
-          JAR_FILE=$(find . -type f \
+          JAR_FILE="$(find . -type f \
             -path "*/build/libs/*.jar" \
             ! -name "*-sources.jar" \
             ! -name "*-dev.jar" \
-            | head -n 1)
+            -print -quit)"
 
-          if [ -z "$JAR_FILE" ]; then
-            echo "ERROR: Gradle did not produce a mod JAR."
-            exit 1
-          fi
-
-          echo "Found mod JAR: $JAR_FILE"
+          echo "Using JAR: $JAR_FILE"
           cp "$JAR_FILE" upload/turbowarp-x-mincraft.jar
-          ls -l upload
 
       - name: Upload mod JAR
         uses: actions/upload-artifact@v4
