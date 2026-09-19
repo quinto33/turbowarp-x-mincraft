@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - main
-
   pull_request:
     branches:
       - main
-
   workflow_dispatch:
 
 jobs:
@@ -23,18 +21,35 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: "21"
-          distribution: temurin
+          distribution: "temurin"
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build mod JAR
-        run: ./gradlew clean build --no-daemon --stacktrace
+      - name: Verify Java and Gradle
+        run: |
+          java -version
+          ./gradlew --version
+
+      - name: Clean previous build files
+        run: ./gradlew clean --no-daemon
+
+      - name: Build remapped mod JAR
+        run: ./gradlew remapJar --no-daemon --stacktrace
+
+      - name: Show generated build files
+        run: |
+          echo "Build directory:"
+          find build -maxdepth 4 -type f -print 2>/dev/null || true
+
+          echo "JAR files:"
+          find . -type f -path "*/build/libs/*.jar" -print
 
       - name: Upload mod JAR
         uses: actions/upload-artifact@v4
         with:
           name: turbowarp-x-mincraft-mod
-          path: build/libs/*.jar
+          path: |
+            build/libs/*.jar
           if-no-files-found: error
           compression-level: 0
