@@ -4,13 +4,16 @@ on:
   push:
     branches:
       - main
+
   pull_request:
     branches:
       - main
+
   workflow_dispatch:
 
 jobs:
   build:
+    name: Build Minecraft Fabric mod
     runs-on: ubuntu-latest
 
     steps:
@@ -22,24 +25,67 @@ jobs:
         with:
           java-version: "21"
           distribution: "temurin"
+          cache: "gradle"
 
       - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
 
-      - name: Remove stale build data
+      - name: Show Java and Gradle versions
+        run: |
+          java -version
+          gradle --version
+
+      - name: Check required project files
+        run: |
+          test -f build.gradle
+          test -f settings.gradle
+          test -f gradle.properties
+          test -f src/main/resources/fabric.mod.json
+          test -f src/main/java/com/quinto33/bridge/TurboWarpClientBridge.java
+
+      - name: Remove stale build files
         run: |
           rm -rf .gradle
           rm -rf build
 
-      - name: Build Fabric mod
-        run: gradle clean remapJar --refresh-dependencies --no-daemon --stacktrace
-
-      - name: Verify JAR
+      - name: Build remapped Fabric mod JAR
         run: |
-          find build/libs -maxdepth 1 -type f -name "*.jar" -print
-          test -n "$(find build/libs -maxdepth 1 -type f -name "*.jar" -print -quit)"
+          gradle clean remapJar \
+            --refresh-dependencies \
+            --no-daemon \
+            --stacktrace
+
+      - name: Display generated files
+        if: always()
+        run: |
+          echo "Generated JAR files:"
+          find . -type f -name "*.jar" -print || true
+
+          echo "build/libs contents:"
+          if [ -d build/libs ]; then
+            ls -la build/libs
+          else
+            echo "build/libs does not exist"
+          fi
+
+      - name: Verify mod JAR
+        run: |
+          JAR_COUNT=$(find build/libs \
+            -maxdepth 1 \
+            -type f \
+            -name "*.jar" \
+            ! -name "*-sources.jar" \
+            ! -name "*-dev.jar" \
+            | wc -l)
+
+          if [ "$JAR_COUNT" -eq 0 ]; then
+            echo "ERROR: No remapped mod JAR was produced."
+            exit 1
+          fi
+
+          echo "Found $JAR_COUNT mod JAR file(s)."
 
       - name: Upload mod JAR
         uses: actions/upload-artifact@v4
