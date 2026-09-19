@@ -16,9 +16,8 @@ import java.util.regex.Pattern;
 
 public final class TurboWarpClientBridge implements ClientModInitializer {
     private static final int PORT = 8080;
-
     private static final Pattern COMMAND_PATTERN = Pattern.compile(
-            "\"cmd\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\""
+            "\"cmd\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\""
     );
 
     private HttpServer webServer;
@@ -40,10 +39,7 @@ public final class TurboWarpClientBridge implements ClientModInitializer {
 
     private void startWebServer() {
         try {
-            webServer = HttpServer.create(
-                    new InetSocketAddress("127.0.0.1", PORT),
-                    0
-            );
+            webServer = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
 
             webServer.createContext("/handshake", this::handleHandshake);
             webServer.createContext("/command", this::handleCommand);
@@ -56,13 +52,9 @@ public final class TurboWarpClientBridge implements ClientModInitializer {
 
             webServer.start();
 
-            System.out.println(
-                    "[TurboWarp Bridge] HTTP server active on http://127.0.0.1:" + PORT
-            );
+            System.out.println("[TurboWarp Bridge] HTTP server active on http://127.0.0.1:" + PORT);
         } catch (IOException exception) {
-            System.err.println(
-                    "[TurboWarp Bridge] Could not start HTTP server on port " + PORT
-            );
+            System.err.println("[TurboWarp Bridge] Could not start HTTP server on port " + PORT + ".");
             exception.printStackTrace();
         }
     }
@@ -94,11 +86,7 @@ public final class TurboWarpClientBridge implements ClientModInitializer {
             return;
         }
 
-        String body = new String(
-                exchange.getRequestBody().readAllBytes(),
-                StandardCharsets.UTF_8
-        );
-
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         Matcher matcher = COMMAND_PATTERN.matcher(body);
 
         if (!matcher.find()) {
@@ -121,9 +109,7 @@ public final class TurboWarpClientBridge implements ClientModInitializer {
             }
 
             if (command.startsWith("/")) {
-                client.player.networkHandler.sendChatCommand(
-                        command.substring(1)
-                );
+                client.player.networkHandler.sendChatCommand(command.substring(1));
             } else {
                 client.player.networkHandler.sendChatMessage(command);
             }
@@ -143,34 +129,14 @@ public final class TurboWarpClientBridge implements ClientModInitializer {
     }
 
     private static void addCorsHeaders(HttpExchange exchange) {
-        exchange.getResponseHeaders().set(
-                "Access-Control-Allow-Origin",
-                "*"
-        );
-
-        exchange.getResponseHeaders().set(
-                "Access-Control-Allow-Methods",
-                "GET, POST, OPTIONS"
-        );
-
-        exchange.getResponseHeaders().set(
-                "Access-Control-Allow-Headers",
-                "Content-Type"
-        );
-
-        exchange.getResponseHeaders().set(
-                "Content-Type",
-                "text/plain; charset=utf-8"
-        );
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+        exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=utf-8");
     }
 
-    private static void sendText(
-            HttpExchange exchange,
-            int status,
-            String text
-    ) throws IOException {
+    private static void sendText(HttpExchange exchange, int status, String text) throws IOException {
         byte[] response = text.getBytes(StandardCharsets.UTF_8);
-
         exchange.sendResponseHeaders(status, response.length);
 
         try (OutputStream output = exchange.getResponseBody()) {
